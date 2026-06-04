@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import axios from "axios";
+import { supabase } from "@/lib/supabaseClient";
 import { FiUsers, FiSearch, FiShoppingCart, FiDollarSign } from "react-icons/fi";
 
 export default function AdminCustomers() {
@@ -26,37 +26,34 @@ export default function AdminCustomers() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch all orders to extract customer order history
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/orders`, { withCredentials: true });
-      const orders = res.data.data;
+      const { data, error } = await supabase.from('orders').select('*, user:profiles(*)');
+      if (error) throw error;
+      const orders = data || [];
       
-      // Group orders by customer
       const customerMap = {};
       
       orders.forEach(order => {
-        // If order has a user attached
         if (order.user) {
-          const userId = order.user._id || order.user.id;
+          const userId = order.user.id;
           if (!customerMap[userId]) {
             customerMap[userId] = {
               id: userId,
               name: order.user.name || "Unknown User",
               orders: [],
               totalSpent: 0,
-              lastOrderDate: order.createdAt
+              lastOrderDate: order.created_at
             };
           }
           
-          customerMap[userId].orders.push(order._id);
-          customerMap[userId].totalSpent += order.totalPrice;
+          customerMap[userId].orders.push(order.id);
+          customerMap[userId].totalSpent += (order.total_price || 0);
           
-          if (new Date(order.createdAt) > new Date(customerMap[userId].lastOrderDate)) {
-            customerMap[userId].lastOrderDate = order.createdAt;
+          if (new Date(order.created_at) > new Date(customerMap[userId].lastOrderDate)) {
+            customerMap[userId].lastOrderDate = order.created_at;
           }
         }
       });
       
-      // Convert map to array and sort by total spent (highest first)
       const customersArray = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
       setCustomers(customersArray);
 

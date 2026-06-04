@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiSearch, FiShoppingCart, FiUser, FiMenu, FiX, FiMapPin, FiSun, FiMoon, FiArrowLeft } from "react-icons/fi";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,16 +24,40 @@ export default function Navbar() {
     };
     
     // Check local storage for user on mount
-    const checkAuth = () => {
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        } else {
+          // If session exists but no local user data, fetch profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profile) {
+            setUser(profile);
+            localStorage.setItem("user", JSON.stringify(profile));
+          }
+        }
       } else {
         setUser(null);
+        localStorage.removeItem("user");
       }
     };
     
     checkAuth();
+
+    // Listen to Supabase auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        localStorage.removeItem("user");
+      }
+    });
 
     // Check dark mode preference
     const isDark = localStorage.getItem("theme") === "dark";
@@ -49,6 +74,7 @@ export default function Navbar() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("authChange", checkAuth);
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
@@ -64,10 +90,12 @@ export default function Navbar() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem("user");
     setUser(null);
     window.dispatchEvent(new Event("authChange"));
+    router.push("/");
   };
 
   return (

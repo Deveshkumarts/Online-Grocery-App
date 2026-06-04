@@ -5,56 +5,70 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 
-export default function Login() {
+export default function Register() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const router = useRouter();
 
-  const handleLogin = async (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      setIsLoading(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: name,
+            role: "user"
+          }
+        }
       });
 
-      if (signInError) throw signInError;
+      if (signUpError) throw signUpError;
 
-      // Fetch user profile to get role
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profileError) {
-        console.error("Could not fetch profile:", profileError);
+      // Check if user already exists or needs email confirmation
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+        throw new Error("User already exists. Please log in.");
       }
 
-      const userData = profileData || {
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.user_metadata?.full_name || "User",
-        role: data.user.user_metadata?.role || "user",
-      };
-
-      localStorage.setItem("user", JSON.stringify(userData));
-      window.dispatchEvent(new Event("authChange"));
-
-      // Redirect based on role
-      if (userData.role === "admin") {
-        router.push("/admin");
-      } else {
+      // Automatically sign them in or prompt for email verification
+      if (data.session) {
+        const userData = {
+          id: data.user.id,
+          email: data.user.email,
+          name: name,
+          role: "user",
+        };
+        localStorage.setItem("user", JSON.stringify(userData));
+        window.dispatchEvent(new Event("authChange"));
         router.push("/");
+      } else {
+        // Supabase requires email verification by default
+        setError("Registration successful! Please check your email to verify your account.");
       }
+
     } catch (err) {
-      console.error("Login failed:", err);
-      setError(err.message || "Failed to authenticate");
+      console.error("Registration failed:", err);
+      setError(err.message || "Failed to register");
     } finally {
       setIsLoading(false);
     }
@@ -69,21 +83,37 @@ export default function Login() {
             T
           </div>
           <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">
-            Welcome Back
+            Create an Account
           </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            Sign in securely to continue
+            Join us to start shopping
           </p>
         </div>
         
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+        <form className="mt-8 space-y-6" onSubmit={handleRegister}>
           {error && (
-            <div className="w-full bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center border border-red-200">
+            <div className={`w-full p-3 rounded-lg text-sm text-center border ${
+              error.includes("successful") 
+                ? "bg-green-50 text-green-600 border-green-200" 
+                : "bg-red-50 text-red-600 border-red-200"
+            }`}>
               {error}
             </div>
           )}
           
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Full Name
+              </label>
+              <input
+                type="text"
+                required
+                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-slate-900 dark:text-white"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Email address
@@ -103,9 +133,23 @@ export default function Login() {
               <input
                 type="password"
                 required
+                minLength="8"
                 className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-slate-900 dark:text-white"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                required
+                minLength="8"
+                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-slate-900 dark:text-white"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </div>
           </div>
@@ -113,25 +157,25 @@ export default function Login() {
           <div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || error?.includes("successful")}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             >
               {isLoading ? (
                 <div className="animate-pulse flex items-center gap-2">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Authenticating...
+                  Registering...
                 </div>
               ) : (
-                "Sign In"
+                "Sign Up"
               )}
             </button>
           </div>
         </form>
         
         <p className="text-center text-sm text-slate-500 mt-8">
-          Don't have an account?{" "}
-          <Link href="/register" className="font-medium text-primary hover:text-primary/80">
-            Sign up
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-primary hover:text-primary/80">
+            Sign in
           </Link>
         </p>
       </div>

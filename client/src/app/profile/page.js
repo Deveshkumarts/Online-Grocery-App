@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
 import { FiUser, FiPackage, FiMapPin, FiSettings, FiEdit2, FiLogOut, FiShoppingBag } from "react-icons/fi";
 import Link from "next/link";
@@ -43,15 +44,29 @@ export default function ProfilePage() {
     router.push("/");
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    // Simulate saving
-    const updatedUser = { ...user, ...formData };
-    localStorage.setItem("user", JSON.stringify(updatedUser));
-    setUser(updatedUser);
-    window.dispatchEvent(new Event("authChange"));
-    setIsEditing(false);
-    alert("Profile updated successfully!");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { error } = await supabase.from('profiles').update({
+          name: formData.name,
+          phone: formData.phone
+        }).eq('id', session.user.id);
+        
+        if (error) throw error;
+      }
+      
+      const updatedUser = { ...user, ...formData };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      window.dispatchEvent(new Event("authChange"));
+      setIsEditing(false);
+      alert("Profile updated successfully!");
+    } catch (error) {
+      alert("Failed to update profile");
+      console.error(error);
+    }
   };
 
   if (isLoading) {

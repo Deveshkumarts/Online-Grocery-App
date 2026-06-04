@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { FiShoppingCart, FiSearch } from "react-icons/fi";
@@ -16,11 +16,15 @@ export default function CategoriesPage() {
     const fetchData = async () => {
       try {
         const [catRes, prodRes] = await Promise.all([
-          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/categories`),
-          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`)
+          supabase.from('categories').select('*'),
+          supabase.from('products').select('*, category:categories(*)')
         ]);
-        setCategories(catRes.data.data);
-        setProducts(prodRes.data.data);
+        
+        const mappedCats = (catRes.data || []).map(c => ({ ...c, _id: c.id }));
+        const mappedProds = (prodRes.data || []).map(p => ({ ...p, _id: p.id }));
+
+        setCategories(mappedCats);
+        setProducts(mappedProds);
       } catch (error) {
         console.error("Failed to load data", error);
       } finally {

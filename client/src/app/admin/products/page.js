@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import axios from "axios";
+import { supabase } from "@/lib/supabaseClient";
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiImage, FiPackage, FiDollarSign } from "react-icons/fi";
 
 export default function AdminProducts() {
@@ -41,8 +41,10 @@ export default function AdminProducts() {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`);
-      setProducts(res.data.data);
+      const { data, error } = await supabase.from('products').select('*, category:categories(*)');
+      if (error) throw error;
+      const mappedProds = (data || []).map(p => ({ ...p, _id: p.id, discountPrice: p.discount_price }));
+      setProducts(mappedProds);
     } catch (error) {
       console.error("Failed to fetch products", error);
     } finally {
@@ -92,36 +94,37 @@ export default function AdminProducts() {
     e.preventDefault();
     try {
       const payload = {
-        ...formData,
-        images: [formData.images], // The backend expects an array
-      };
-
-      const token = document.cookie.split('token=')[1]?.split(';')[0]; // Quick token extraction
-
-      const config = {
-        withCredentials: true,
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        discount_price: formData.discountPrice ? parseFloat(formData.discountPrice) : null,
+        images: [formData.images],
+        category_id: formData.category || null,
+        stock: parseInt(formData.stock, 10),
+        unit: formData.unit,
       };
 
       if (editingId) {
-        // Update Product
-        await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/products/${editingId}`, payload, config);
+        const { error } = await supabase.from('products').update(payload).eq('id', editingId);
+        if (error) throw error;
       } else {
-        // Add Product
-        await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/products`, payload, config);
+        const { error } = await supabase.from('products').insert(payload);
+        if (error) throw error;
       }
       
       closeModal();
       fetchProducts();
     } catch (error) {
       console.error("Error saving product", error);
-      alert(error.response?.data?.error || "Failed to save product. Make sure you fill all required fields.");
+      alert(error.message || "Failed to save product. Make sure you fill all required fields.");
     }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       try {
-        await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/products/${id}`, { withCredentials: true });
+        const { error } = await supabase.from('products').delete().eq('id', id);
+        if (error) throw error;
         fetchProducts();
       } catch (error) {
         console.error("Error deleting product", error);

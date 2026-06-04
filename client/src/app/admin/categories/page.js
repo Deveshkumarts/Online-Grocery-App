@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import axios from "axios";
+import { supabase } from "@/lib/supabaseClient";
 import { FiPlus, FiGrid, FiTrash2, FiSearch, FiX, FiCheckCircle } from "react-icons/fi";
 
 export default function AdminCategories() {
@@ -33,11 +33,13 @@ export default function AdminCategories() {
     setIsLoading(true);
     try {
       const [catRes, prodRes] = await Promise.all([
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/categories`),
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products?limit=100`)
+        supabase.from('categories').select('*'),
+        supabase.from('products').select('*, category:categories(*)')
       ]);
-      setCategories(catRes.data.data);
-      setProducts(prodRes.data.data);
+      const mappedCats = (catRes.data || []).map(c => ({ ...c, _id: c.id }));
+      const mappedProds = (prodRes.data || []).map(p => ({ ...p, _id: p.id }));
+      setCategories(mappedCats);
+      setProducts(mappedProds);
     } catch (error) {
       console.error("Failed to fetch data", error);
     } finally {
@@ -48,25 +50,29 @@ export default function AdminCategories() {
   const handleCreateCategory = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/categories`,
-        { name: categoryName, description: categoryDescription, image: categoryImage },
-        { withCredentials: true }
-      );
+      const { error } = await supabase.from('categories').insert({
+        name: categoryName,
+        description: categoryDescription,
+        image: categoryImage || 'no-photo.jpg'
+      });
+      if (error) throw error;
+      
       setCategoryName("");
       setCategoryDescription("");
       setCategoryImage("");
       setIsModalOpen(false);
       fetchData();
     } catch (error) {
-      alert(error.response?.data?.error || "Failed to create category");
+      alert(error.message || "Failed to create category");
     }
   };
 
   const handleDeleteCategory = async (id) => {
     if (window.confirm("Delete this category? Products in it will be uncategorized.")) {
       try {
-        await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/categories/${id}`, { withCredentials: true });
+        await supabase.from('products').update({ category_id: null }).eq('category_id', id);
+        const { error } = await supabase.from('categories').delete().eq('id', id);
+        if (error) throw error;
         fetchData();
       } catch (error) {
         console.error("Error deleting category", error);
@@ -76,21 +82,14 @@ export default function AdminCategories() {
 
   const updateProductCategory = async (productId, categoryId) => {
     try {
-      // Find the specific product to ensure we retain its other fields
-      const product = products.find(p => p._id === productId);
-      
-      await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/products/${productId}`,
-        { 
-          category: categoryId === "uncategorized" ? null : categoryId 
-        },
-        { withCredentials: true }
-      );
+      const newCatId = categoryId === "uncategorized" ? null : categoryId;
+      const { error } = await supabase.from('products').update({ category_id: newCatId }).eq('id', productId);
+      if (error) throw error;
       
       // Update local state to reflect change instantly
       setProducts(products.map(p => {
         if (p._id === productId) {
-          return { ...p, category: categoryId === "uncategorized" ? null : categories.find(c => c._id === categoryId) };
+          return { ...p, category: newCatId ? categories.find(c => c._id === categoryId) : null, category_id: newCatId };
         }
         return p;
       }));

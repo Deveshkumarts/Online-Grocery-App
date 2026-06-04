@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { FiArrowRight, FiClock, FiShield, FiTruck } from "react-icons/fi";
-import Image from "next/image";
-import axios from "axios";
+import { supabase } from "@/lib/supabaseClient";
 
 const categories = [
   { _id: "c1", name: "Fresh Vegetables", image: "https://images.unsplash.com/photo-1566385101042-1a0aa0c1268c?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", color: "bg-green-100 dark:bg-green-900/30" },
@@ -38,11 +37,16 @@ export default function Home() {
     const fetchData = async () => {
       try {
         const [catRes, prodRes] = await Promise.all([
-          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/categories`),
-          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products?limit=8`) // Get latest 8 products
+          supabase.from('categories').select('*'),
+          supabase.from('products').select('*').order('created_at', { ascending: false }).limit(8)
         ]);
-        setDbCategories(catRes.data.data.length > 0 ? catRes.data.data : categories);
-        setDbProducts(prodRes.data.data.length > 0 ? prodRes.data.data : popularProducts);
+        
+        // Map Supabase IDs to _id to keep component compatibility
+        const mappedCats = (catRes.data || []).map(c => ({ ...c, _id: c.id }));
+        const mappedProds = (prodRes.data || []).map(p => ({ ...p, _id: p.id }));
+
+        setDbCategories(mappedCats.length > 0 ? mappedCats : categories);
+        setDbProducts(mappedProds.length > 0 ? mappedProds : popularProducts);
       } catch (error) {
         console.error("Failed to load store data", error);
         setDbCategories(categories);

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import axios from "axios";
+import { supabase } from "@/lib/supabaseClient";
 import { FiShoppingCart, FiSearch, FiMoreVertical, FiEye, FiClock, FiCheckCircle, FiTruck, FiPackage, FiXCircle } from "react-icons/fi";
 
 const statusIcons = {
@@ -45,8 +45,24 @@ export default function AdminOrders() {
 
   const fetchOrders = async () => {
     try {
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/orders`, { withCredentials: true });
-      setOrders(res.data.data);
+      const { data, error } = await supabase.from('orders').select('*, user:profiles(*)').order('created_at', { ascending: false });
+      if (error) throw error;
+      const mappedOrders = (data || []).map(o => ({
+        ...o,
+        _id: o.id,
+        createdAt: o.created_at,
+        shippingAddress: o.shipping_address || {},
+        totalPrice: o.total_price || 0,
+        orderItems: o.order_items || [],
+        isPaid: o.is_paid,
+        paidAt: o.paid_at,
+        orderStatus: o.order_status,
+        paymentMethod: o.payment_method,
+        itemsPrice: o.items_price || 0,
+        taxPrice: o.tax_price || 0,
+        shippingPrice: o.shipping_price || 0
+      }));
+      setOrders(mappedOrders);
     } catch (error) {
       console.error("Failed to fetch orders", error);
     } finally {
@@ -56,11 +72,8 @@ export default function AdminOrders() {
 
   const updateOrderStatus = async (id, newStatus) => {
     try {
-      await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/orders/${id}/status`,
-        { orderStatus: newStatus },
-        { withCredentials: true }
-      );
+      const { error } = await supabase.from('orders').update({ order_status: newStatus }).eq('id', id);
+      if (error) throw error;
       
       // Update locally
       setOrders(orders.map(order => order._id === id ? { ...order, orderStatus: newStatus } : order));
