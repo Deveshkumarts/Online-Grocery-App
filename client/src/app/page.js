@@ -6,27 +6,7 @@ import Link from "next/link";
 import { FiArrowRight, FiClock, FiShield, FiTruck } from "react-icons/fi";
 import { supabase } from "@/lib/supabaseClient";
 
-const categories = [
-  { _id: "c1", name: "Fresh Vegetables", image: "https://images.unsplash.com/photo-1566385101042-1a0aa0c1268c?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", color: "bg-green-100 dark:bg-green-900/30" },
-  { _id: "c2", name: "Fresh Fruits", image: "https://images.unsplash.com/photo-1610832958506-aa56368176cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", color: "bg-orange-100 dark:bg-orange-900/30" },
-  { _id: "c3", name: "Dairy & Bakery", image: "https://images.unsplash.com/photo-1628088062854-d1870b4553da?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", color: "bg-blue-100 dark:bg-blue-900/30" },
-  { _id: "c4", name: "Snacks & Drinks", image: "https://images.unsplash.com/photo-1599508704512-2f19efd1eede?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", color: "bg-red-100 dark:bg-red-900/30" },
-  { _id: "c5", name: "Cleaning Needs", image: "https://images.unsplash.com/photo-1585421514738-01798e348b17?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", color: "bg-teal-100 dark:bg-teal-900/30" },
-  { _id: "c6", name: "Meat & Fish", image: "https://images.unsplash.com/photo-1607623814075-e51df1bd682f?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", color: "bg-rose-100 dark:bg-rose-900/30" },
-];
-
-const features = [
-  { icon: <FiClock size={24} />, title: "10-Minute Delivery", desc: "Get your order delivered to your doorstep in minutes." },
-  { icon: <FiShield size={24} />, title: "Premium Quality", desc: "We source only the best and freshest products for you." },
-  { icon: <FiTruck size={24} />, title: "Free Delivery", desc: "Enjoy free delivery on all orders above ₹499." },
-];
-
-const popularProducts = [
-  { _id: "p1", name: "Fresh Tomatoes", price: 40, unit: "1 kg", images: ["https://images.unsplash.com/photo-1592924357228-91a4daadcfea?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80"] },
-  { _id: "p2", name: "Farm Fresh Eggs", price: 65, unit: "6 pcs", images: ["https://images.unsplash.com/photo-1587486913049-53fc88980cfc?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80"] },
-  { _id: "p3", name: "Whole Wheat Bread", price: 45, unit: "400 g", images: ["https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80"] },
-  { _id: "p4", name: "Fresh Milk", price: 32, unit: "500 ml", images: ["https://images.unsplash.com/photo-1550583724-b2692b85b150?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80"] },
-];
+import { addToCart } from "@/lib/cart";
 
 export default function Home() {
   const [dbCategories, setDbCategories] = useState([]);
@@ -45,12 +25,12 @@ export default function Home() {
         const mappedCats = (catRes.data || []).map(c => ({ ...c, _id: c.id }));
         const mappedProds = (prodRes.data || []).map(p => ({ ...p, _id: p.id }));
 
-        setDbCategories(mappedCats.length > 0 ? mappedCats : categories);
-        setDbProducts(mappedProds.length > 0 ? mappedProds : popularProducts);
+        setDbCategories(mappedCats);
+        setDbProducts(mappedProds);
       } catch (error) {
         console.error("Failed to load store data", error);
-        setDbCategories(categories);
-        setDbProducts(popularProducts);
+        setDbCategories([]);
+        setDbProducts([]);
       } finally {
         setIsLoading(false);
       }
@@ -126,24 +106,51 @@ export default function Home() {
       <section className="py-12 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {features.map((feature, idx) => (
-              <motion.div 
-                key={idx}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="flex items-start gap-4 p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50"
-              >
-                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                  {feature.icon}
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-1 text-slate-900 dark:text-white">{feature.title}</h3>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">{feature.desc}</p>
-                </div>
-              </motion.div>
-            ))}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0 * 0.1 }}
+              className="flex items-start gap-4 p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50"
+            >
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                <FiClock size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-1 text-slate-900 dark:text-white">10-Minute Delivery</h3>
+                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Get your order delivered to your doorstep in minutes.</p>
+              </div>
+            </motion.div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 1 * 0.1 }}
+              className="flex items-start gap-4 p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50"
+            >
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                <FiShield size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-1 text-slate-900 dark:text-white">Premium Quality</h3>
+                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">We source only the best and freshest products for you.</p>
+              </div>
+            </motion.div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 2 * 0.1 }}
+              className="flex items-start gap-4 p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50"
+            >
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                <FiTruck size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-1 text-slate-900 dark:text-white">Free Delivery</h3>
+                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Enjoy free delivery on all orders above ₹499.</p>
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -227,7 +234,7 @@ export default function Home() {
                     {product.discountPrice && <span className="text-slate-400 line-through text-sm">₹{product.discountPrice}</span>}
                   </div>
                 </div>
-                <button className="w-full py-2.5 rounded-xl border-2 border-primary text-primary font-bold hover:bg-primary hover:text-white transition-colors">
+                <button onClick={() => addToCart(product)} className="w-full py-2.5 rounded-xl border-2 border-primary text-primary font-bold hover:bg-primary hover:text-white transition-colors">
                   Add to Cart
                 </button>
               </motion.div>

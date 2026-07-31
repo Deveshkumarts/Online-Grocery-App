@@ -1,14 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { FiCheck, FiMapPin, FiCreditCard, FiDollarSign } from "react-icons/fi";
+import { getCart, clearCart } from "@/lib/cart";
 
 export default function Checkout() {
   const [step, setStep] = useState(1);
   const [selectedAddress, setSelectedAddress] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [cartItems, setCartItems] = useState([]);
+
+  useEffect(() => {
+    setCartItems(getCart());
+  }, []);
+
+  const itemTotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const deliveryFee = itemTotal > 499 ? 0 : 30;
+  const tax = Math.round(itemTotal * 0.05); // 5% GST
+  const finalTotal = itemTotal + deliveryFee + tax;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 md:py-12">
@@ -127,8 +138,8 @@ export default function Checkout() {
                   <button onClick={() => setStep(1)} className="font-bold text-slate-600 dark:text-slate-400 hover:text-primary transition-colors">
                     Back
                   </button>
-                  <Link href="/order-success" className="bg-primary hover:bg-primary-hover text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md">
-                    Place Order - ₹190
+                  <Link onClick={() => clearCart()} href="/order-success" className="bg-primary hover:bg-primary-hover text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md">
+                    Place Order - ₹{finalTotal}
                   </Link>
                 </div>
               </motion.div>
@@ -142,35 +153,33 @@ export default function Checkout() {
             <h2 className="font-bold text-xl mb-4 border-b border-slate-200 dark:border-slate-800 pb-4">Order Summary</h2>
             
             <div className="flex flex-col gap-3 mb-6 max-h-40 overflow-y-auto">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600 dark:text-slate-400">2x Fresh Tomatoes</span>
-                <span className="font-medium">₹80</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600 dark:text-slate-400">1x Whole Wheat Bread</span>
-                <span className="font-medium">₹45</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600 dark:text-slate-400">1x Farm Fresh Eggs</span>
-                <span className="font-medium">₹65</span>
-              </div>
+              {cartItems.map((item) => (
+                <div key={item.id} className="flex justify-between text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">{item.quantity}x {item.name}</span>
+                  <span className="font-medium">₹{item.price * item.quantity}</span>
+                </div>
+              ))}
             </div>
             
             <div className="space-y-3 mb-4 pt-4 border-t border-slate-200 dark:border-slate-800">
               <div className="flex justify-between text-slate-600 dark:text-slate-400 text-sm">
                 <span>Item Total</span>
-                <span>₹190</span>
+                <span>₹{itemTotal}</span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400 text-sm">
                 <span>Delivery Fee</span>
-                <span className="text-primary font-bold">FREE</span>
+                <span className="text-primary font-bold">{deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 text-sm">
+                <span>Taxes (5%)</span>
+                <span>₹{tax}</span>
               </div>
             </div>
             
             <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-lg">Amount to Pay</span>
-                <span className="font-extrabold text-xl text-primary">₹190</span>
+                <span className="font-extrabold text-xl text-primary">₹{finalTotal}</span>
               </div>
             </div>
           </div>

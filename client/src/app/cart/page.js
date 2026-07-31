@@ -1,16 +1,20 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { FiTrash2, FiMinus, FiPlus, FiArrowRight, FiShield } from "react-icons/fi";
-
-const cartItems = [
-  { id: 1, name: "Fresh Tomatoes", price: 40, unit: "1 kg", quantity: 2, image: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80" },
-  { id: 2, name: "Whole Wheat Bread", price: 45, unit: "400 g", quantity: 1, image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80" },
-  { id: 3, name: "Farm Fresh Eggs", price: 65, unit: "6 pcs", quantity: 1, image: "https://images.unsplash.com/photo-1587486913049-53fc88980cfc?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80" },
-];
+import { getCart, updateQuantity, removeFromCart } from "@/lib/cart";
 
 export default function Cart() {
+  const [cartItems, setCartItems] = useState([]);
+
+  useEffect(() => {
+    const fetchCart = () => setCartItems(getCart());
+    fetchCart();
+    window.addEventListener("cartUpdated", fetchCart);
+    return () => window.removeEventListener("cartUpdated", fetchCart);
+  }, []);
   const itemTotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const deliveryFee = itemTotal > 499 ? 0 : 30;
   const tax = Math.round(itemTotal * 0.05); // 5% GST
@@ -41,16 +45,16 @@ export default function Cart() {
                   
                   <div className="flex items-center gap-4 mt-4 sm:mt-0 w-full sm:w-auto justify-between">
                     <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                      <button className="p-2 text-slate-600 hover:text-primary transition-colors"><FiMinus /></button>
+                      <button onClick={() => updateQuantity(item.id, -1)} className="p-2 text-slate-600 hover:text-primary transition-colors"><FiMinus /></button>
                       <span className="w-10 text-center font-bold">{item.quantity}</span>
-                      <button className="p-2 text-slate-600 hover:text-primary transition-colors"><FiPlus /></button>
+                      <button onClick={() => updateQuantity(item.id, 1)} className="p-2 text-slate-600 hover:text-primary transition-colors"><FiPlus /></button>
                     </div>
                     
                     <div className="text-right sm:w-24">
                       <div className="font-bold text-lg">₹{item.price * item.quantity}</div>
                     </div>
                     
-                    <button className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                    <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
                       <FiTrash2 size={20} />
                     </button>
                   </div>
